@@ -73,7 +73,7 @@ public class Main extends JPanel {
 
         int width = getWidth();
         int height = getHeight();
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage screenImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
 
         float w_half = width / 2f;
         float h_half = height / 2f;
@@ -115,12 +115,12 @@ public class Main extends JPanel {
                     final float v = m12 * AP.x() + m22 * AP.y();
 
                     if (u >= 0 && v >= 0 && (u + v) < 1) {
-                        image.setRGB(x, y, v1Color);
+                        screenImage.setRGB(x, y, v1Color);
                     }
                 }
             }
         }
-        g.drawImage(image, 0, 0, null);
+        g.drawImage(screenImage, 0, 0, null);
     }
 
     Vertex VertexShader(Vertex v, Matrix4x4 MVP) {
