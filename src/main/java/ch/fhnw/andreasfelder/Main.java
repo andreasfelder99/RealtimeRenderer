@@ -31,9 +31,11 @@ public class Main extends JPanel {
     public final Vector3 up = new Vector3(0, -1, 0);
     public Vector3 LightPos = new Vector3(0, 5, -5);
 
-    public final float zNear = 0.1f;
+    protected final float zNear = 0.1f;
     public final float zFar = 100f;
     public final float fov = (float) Math.toRadians(90);
+
+    protected float[][] zBuffer;
 
     public Main() {
         JFrame frame = new JFrame("comgr Part B");
@@ -56,7 +58,8 @@ public class Main extends JPanel {
         Matrix4x4 P = Matrix4x4.createPerspectiveFieldOfView(fov, 1, zNear, zFar);
         Matrix4x4 VP = V.multiply(P);
 
-        Timer timer = new Timer(10, actionEvent -> {
+
+        Timer timer = new Timer(20, actionEvent -> {
             angle -= 0.01;
             M = Matrix4x4.createRotationY(angle);
             MVP = M.multiply(VP);
@@ -72,6 +75,7 @@ public class Main extends JPanel {
         if (MVP == null) {
             return;
         }
+        zBuffer = newZBuffer(getWidth(), getHeight());
 
         int width = getWidth();
         int height = getHeight();
@@ -127,7 +131,13 @@ public class Main extends JPanel {
                         float z = (zFar * zNear) / (zFar + (zNear - zFar) * Q.position().z());
                         Q = Q.multiply(z);
 
-                        screenImage.setRGB(x, y, FragmentShader(Q).awtColorFromVector().getRGB());
+                        if (z < zBuffer[y][x]) {
+                            zBuffer[y][x] = z;
+                            screenImage.setRGB(x, y, FragmentShader(Q).awtColorFromVector().getRGB());
+                        }
+
+                        //USE THIS FOR TESTING
+                        //screenImage.setRGB(x, y, (FragmentShader(Q).multiply(z-1.5f)).awtColorFromVector().getRGB());
                     }
                 }
             }
@@ -155,6 +165,7 @@ public class Main extends JPanel {
             color = color.add(vertexColor.WHITE.multiply(vertexColor.WHITE).multiply((float) Math.pow(specularAngle, 10)));
         }
 
+        //return color;
         return color;
     }
 
@@ -185,6 +196,16 @@ public class Main extends JPanel {
 
     private Vertex projectVertex(Vertex v) {
         return v.multiply(1 / v.position().w());
+    }
+
+    protected float[][] newZBuffer(final int width, final int height) {
+        final float[][] zBuffer = new float[height][width];
+        for (int y = 0; y < height; y++){
+            for (int x = 0; x < width; x++){
+                zBuffer[y][x] = zFar;
+            }
+        }
+        return zBuffer;
     }
 
     public static void main(String[] args) {
