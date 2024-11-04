@@ -141,10 +141,9 @@ public record Vector3(float x, float y, float z) {
     }
 
     public Color awtColorFromVector() {
-        return new Color(
-            (float) Math.pow(x, 1/2.2),
-            (float) Math.pow(y, 1/2.2),
-            (float) Math.pow(z, 1/2.2)
-        );
+        int r = (int) Math.max(0, Math.min(255, this.x * 255));
+        int g = (int) Math.max(0, Math.min(255, this.y * 255));
+        int b = (int) Math.max(0, Math.min(255, this.z * 255));
+        return new Color(r, g, b);
     }
 }
