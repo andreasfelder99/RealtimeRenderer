@@ -15,13 +15,8 @@ import javax.swing.JPanel;
 import javax.swing.Timer;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
-import java.util.List;
 
 public class Main extends JPanel {
-    public final List<Vertex> vertices = new ArrayList<>();
-    public final List<Tri> tri = new ArrayList<>();
-
     public Matrix4x4 M = Matrix4x4.IDENTITY;
     public Matrix4x4 MVP;
     private float angle = 0;
@@ -29,30 +24,23 @@ public class Main extends JPanel {
     public final Vector3 cameraPosition = new Vector3(0, 2, -3);
     public final Vector3 lookAt = new Vector3(0, 0, 0);
     public final Vector3 up = new Vector3(0, -1, 0);
-    public Vector3 LightPos = new Vector3(0, 5, -5);
+    public Vector3 LightPos = new Vector3(0, 5, -10);
 
     protected final float zNear = 0.1f;
     public final float zFar = 100f;
     public final float fov = (float) Math.toRadians(90);
 
+    public SceneGraphNode node;
+
     protected float[][] zBuffer;
 
-    public Main() {
+    public Main(SceneGraphNode node) {
+        this.node = node;
         JFrame frame = new JFrame("comgr Part B");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(600, 600);
         frame.add(this);
         frame.setVisible(true);
-
-        MeshGenerator.addCube(
-            vertices,
-            tri,
-            vertexColor.RED,
-            vertexColor.GREEN,
-            vertexColor.BLUE,
-            vertexColor.YELLOW,
-            vertexColor.CYAN,
-            vertexColor.MAGENTA);
 
         Matrix4x4 V = Matrix4x4.createLookAt(cameraPosition, lookAt, up);
         Matrix4x4 P = Matrix4x4.createPerspectiveFieldOfView(fov, 1, zNear, zFar);
@@ -61,14 +49,13 @@ public class Main extends JPanel {
 
         Timer timer = new Timer(20, actionEvent -> {
             angle -= 0.01;
-            M = Matrix4x4.createRotationY(angle);
+            M = node.transformation.transform(angle);
             MVP = M.multiply(VP);
             repaint();
         });
         timer.start();
     }
 
-    @Override
     public void paint(Graphics g) {
         super.paint(g);
 
@@ -84,10 +71,19 @@ public class Main extends JPanel {
         float w_half = width / 2f;
         float h_half = height / 2f;
 
-        for (Tri t : tri) {
-            Vertex A = projectVertex(VertexShader(vertices.get(t.a()), MVP, M));
-            Vertex B = projectVertex(VertexShader(vertices.get(t.b()), MVP, M));
-            Vertex C = projectVertex(VertexShader(vertices.get(t.c()), MVP, M));
+        renderNode(g, screenImage, w_half, h_half, node, Matrix4x4.IDENTITY);
+
+        g.drawImage(screenImage, 0, 0, null);
+    }
+
+    private void renderNode(Graphics g, BufferedImage screenImage, float w_half, float h_half, SceneGraphNode node, Matrix4x4 parentTransform) {
+        Matrix4x4 currentTransform = node.transformation.transform(angle).multiply(parentTransform);
+        Matrix4x4 currentMVP = currentTransform.multiply(MVP);
+
+        for (Tri t : node.tri) {
+            Vertex A = projectVertex(VertexShader(node.vertices.get(t.a()), currentMVP, currentTransform));
+            Vertex B = projectVertex(VertexShader(node.vertices.get(t.b()), currentMVP, currentTransform));
+            Vertex C = projectVertex(VertexShader(node.vertices.get(t.c()), currentMVP, currentTransform));
 
             Vector2 p1 = transformToScreenPixel(A, w_half, h_half);
             Vector2 p2 = transformToScreenPixel(B, w_half, h_half);
@@ -117,8 +113,8 @@ public class Main extends JPanel {
             float m12 = ABACInv.m12();
             float m22 = ABACInv.m22();
 
-            for (int y = 0; y < height; y++) {
-                for (int x = 0; x < width; x++) {
+            for (int y = 0; y < getHeight(); y++) {
+                for (int x = 0; x < getWidth(); x++) {
                     final Vector2 AP = new Vector2(x + 0.25f, y + 0.25f).subtract(p1);
                     final float u = m11 * AP.x() + m21 * AP.y();
                     final float v = m12 * AP.x() + m22 * AP.y();
@@ -126,8 +122,6 @@ public class Main extends JPanel {
                     if (u >= 0 && v >= 0 && (u + v) < 1) {
                         Vertex Q = A.add(AB.multiply(u)).add(AC.multiply(v));
 
-
-                        // Transform Q back to camera space
                         float z = (zFar * zNear) / (zFar + (zNear - zFar) * Q.position().z());
                         Q = Q.multiply(z);
 
@@ -135,14 +129,15 @@ public class Main extends JPanel {
                             zBuffer[y][x] = z;
                             screenImage.setRGB(x, y, FragmentShader(Q).awtColorFromVector().getRGB());
                         }
-
-                        //USE THIS FOR TESTING
                         //screenImage.setRGB(x, y, (FragmentShader(Q).multiply(z-1.5f)).awtColorFromVector().getRGB());
                     }
                 }
             }
         }
-        g.drawImage(screenImage, 0, 0, null);
+
+        for (SceneGraphNode child : node.children) {
+            renderNode(g, screenImage, w_half, h_half, child, currentTransform);
+        }
     }
 
     private Vector3 FragmentShader(Vertex v){
@@ -209,6 +204,8 @@ public class Main extends JPanel {
     }
 
     public static void main(String[] args) {
-        new Main();
+        SceneGraph graph = new SceneGraph();
+        graph.create2CubeScene();
+        new Main(graph.graph);
     }
 }
