@@ -106,7 +106,12 @@ public record Vector3(float x, float y, float z) {
     }
 
     public static Vector3 reflect(Vector3 vector, Vector3 normal) {
-        return vector.subtract(normal.multiply(2 * dot(vector, normal)));
+        return vector.subtract(normal.multiply(2.0f * dot(vector, normal)));
+    }
+
+    public static Vector3 reflectTest(Vector3 vector, Vector3 normal) {
+        float dot = Vector3.dot(vector, normal);
+        return vector.subtract(normal.multiply(2.0f * dot));
     }
 
     public Vector3 subtract(Vector3 v) {

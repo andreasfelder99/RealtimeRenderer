@@ -30,7 +30,7 @@ public class Main extends JPanel {
     public final Vector3 cameraPosition = new Vector3(0, 0, -4);
     public final Vector3 lookAt = new Vector3(0, 0, 0);
     public final Vector3 up = new Vector3(0, -1, 0);
-    public Vector3 LightPos = new Vector3(-10, -10, -10);
+    public Vector3 LightPos = new Vector3(0, 0, -5);
 
     private Vector3 PSpecular = vertexColor.WHITE;
     private Vector3 LightColour = vertexColor.WHITE;
@@ -62,11 +62,17 @@ public class Main extends JPanel {
         List<Tri> cubeTris = new ArrayList<>();
         MeshGenerator.addCube(cubeVertices, cubeTris, vertexColor.RED, vertexColor.GREEN, vertexColor.BLUE, vertexColor.YELLOW, vertexColor.MAGENTA, vertexColor.CYAN);
         try {
-            BufferedImage texture = ImageIO.read(this.getClass().getResourceAsStream("/bricks.jpg"));
-            sceneQueue.add(new SceneGraphNode(cubeVertices, cubeTris, Matrix4x4.createRotationY(0.5f), null));
+            BufferedImage texture = ImageIO.read(this.getClass().getResourceAsStream("/test1.jpg"));
+            sceneQueue.add(new SceneGraphNode(cubeVertices, cubeTris, Matrix4x4.createRotationY(0.5f), texture));
         } catch (IOException e) {
             sceneQueue.add(new SceneGraphNode(cubeVertices, cubeTris, Matrix4x4.createRotationY(0.5f), null));
         }
+
+        //Sphere
+//        List<Vertex> sphereVertices = new ArrayList<>();
+//        List<Tri> sphereTris = new ArrayList<>();
+//        MeshGenerator.addSphere(sphereVertices, sphereTris, 20, vertexColor.CYAN);
+//        sceneQueue.add(new SceneGraphNode(sphereVertices, sphereTris, Matrix4x4.createRotationY(0.5f), null));
 
 
 //        // Cube 2
@@ -178,7 +184,7 @@ public class Main extends JPanel {
                     if (z < zBuffer[y][x]) {
                         zBuffer[y][x] = z;
 
-                        Vector3 color = fragmentShader(Q, texture, false);
+                        Vector3 color = fragmentShader(Q, texture, true);
                         screenImage.setRGB(x, y, color.awtColorFromVector().getRGB());
                     }
                 }
@@ -231,7 +237,7 @@ public class Main extends JPanel {
             color = color.add(Vector3.multiply(LightColour, Q.color()).multiply(diffuseAngle));
 
             // Phong
-            Vector3 sHat = Vector3.normalize(Vector3.reflect(PL, nHat));
+            Vector3 sHat = Vector3.normalize(Vector3.reflect(PLHat, nHat));
             Vector3 EPHat = Vector3.normalize(P.subtract(cameraPosition));
             float specularAngle = Vector3.dot(sHat, EPHat);
             if (specularAngle > 0) {
@@ -246,17 +252,32 @@ public class Main extends JPanel {
         Matrix4x4 MNormal = Matrix4x4.transpose(Matrix4x4.invert(M)).multiply(M.getDeterminant());
 
         Vector4 transformedPosition = Vector4.transform(v.position(), MVP);
-        Vector3 transformedWorldPosition = Vector3.transform(v.worldCoordinates(), M);
+        Vector4 transformedWorldPosition = Vector4.transform(v.position(), M);
         Vector3 transformedNormal = Vector3.transformNormal(v.normal(), MNormal);
 
         return new Vertex(
             transformedPosition,
-            transformedWorldPosition,
+            new Vector3(transformedWorldPosition.x(), transformedPosition.y(), transformedWorldPosition.z()),
             v.color(),
             v.st(),
             transformedNormal
         );
     }
+
+//    private static Vertex VertexShader(Vertex v, Matrix4x4 M, Matrix4x4 VP)
+//    {
+//        Vector4 pos = Vector4.Transform(v.Position, M * VP);
+//        Vector4 worldC = Vector4.Transform(v.Position, M);
+//
+//        Matrix4x4 inverted;
+//        Matrix4x4.Invert(M, out inverted);
+//        inverted = Matrix4x4.Transpose(inverted);
+//        Vector4 norm4 = Vector4.Transform(new Vector4(v.Normal.X, v.Normal.Y, v.Normal.Z, 0), inverted * M.GetDeterminant());
+//
+//        Vector3 norm = new Vector3(norm4.X, norm4.Y, norm4.Z);
+//
+//        return new Vertex(pos, new Vector3(worldC.X, worldC.Y, worldC.Z), v.Color, v.ST, norm);
+//    }
 
     private Vector2 transformToScreenPixel(Vertex v, float w_half, float h_half) {
         float x = v.position().x();
