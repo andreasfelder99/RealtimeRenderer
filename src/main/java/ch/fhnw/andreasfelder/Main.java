@@ -30,7 +30,7 @@ public class Main extends JPanel {
     public final Vector3 cameraPosition = new Vector3(0, 0, -4);
     public final Vector3 lookAt = new Vector3(0, 0, 0);
     public final Vector3 up = new Vector3(0, -1, 0);
-    public Vector3 LightPos = new Vector3(0, 0, -5);
+    public Vector3 LightPos = new Vector3(0, 0, -6);
 
     private Vector3 PSpecular = vertexColor.WHITE;
     private Vector3 LightColour = vertexColor.WHITE;
@@ -57,51 +57,39 @@ public class Main extends JPanel {
         P = Matrix4x4.createPerspectiveFieldOfView(fov, 1, zNear, zFar);
         VP = V.multiply(P);
 
+        BufferedImage bilinearTexture = getBilinearTexture();
+
         // Cube 1
         List<Vertex> cubeVertices = new ArrayList<>();
         List<Tri> cubeTris = new ArrayList<>();
         MeshGenerator.addCube(cubeVertices, cubeTris, vertexColor.RED, vertexColor.GREEN, vertexColor.BLUE, vertexColor.YELLOW, vertexColor.MAGENTA, vertexColor.CYAN);
         try {
             BufferedImage texture = ImageIO.read(this.getClass().getResourceAsStream("/test1.jpg"));
-            sceneQueue.add(new SceneGraphNode(cubeVertices, cubeTris, Matrix4x4.createRotationY(0.5f), texture));
+            sceneQueue.add(new SceneGraphNode(cubeVertices, cubeTris, Matrix4x4.createRotationY(0.5f), bilinearTexture));
         } catch (IOException e) {
             sceneQueue.add(new SceneGraphNode(cubeVertices, cubeTris, Matrix4x4.createRotationY(0.5f), null));
         }
-
-        //Sphere
-//        List<Vertex> sphereVertices = new ArrayList<>();
-//        List<Tri> sphereTris = new ArrayList<>();
-//        MeshGenerator.addSphere(sphereVertices, sphereTris, 20, vertexColor.CYAN);
-//        sceneQueue.add(new SceneGraphNode(sphereVertices, sphereTris, Matrix4x4.createRotationY(0.5f), null));
-
-
-//        // Cube 2
-//        List<Vertex> cube2Vertices = new ArrayList<>();
-//        List<Tri> cube2Tris = new ArrayList<>();
-//        MeshGenerator.addCube(cube2Vertices, cube2Tris, vertexColor.RED, vertexColor.GREEN, vertexColor.BLUE, vertexColor.YELLOW, vertexColor.MAGENTA, vertexColor.CYAN);
-//        sceneQueue.add(new SceneGraphNode(cube2Vertices, cube2Tris, Matrix4x4.createRotationX(0.8f), null));
-
-        //Checkerboard texture to show off bilinear filtering
-//        BufferedImage checkerboard = new BufferedImage(128, 128, BufferedImage.TYPE_INT_ARGB);
-//        for (int y = 0; y < 128; y++) {
-//            for (int x = 0; x < 128; x++) {
-//                if ((x / 16 + y / 16) % 2 == 0) {
-//                    checkerboard.setRGB(x, y, 0xFFFFFFFF); // White
-//                } else {
-//                    checkerboard.setRGB(x, y, 0xFF000000); // Black
-//                }
-//            }
-//        }
-//        List<Vertex> cube2Vertices = new ArrayList<>();
-//        List<Tri> cube2Tris = new ArrayList<>();
-//        MeshGenerator.addCube(cube2Vertices, cube2Tris, vertexColor.RED, vertexColor.GREEN, vertexColor.BLUE, vertexColor.YELLOW, vertexColor.MAGENTA, vertexColor.CYAN);
-//        sceneQueue.add(new SceneGraphNode(cube2Vertices, cube2Tris, Matrix4x4.createRotationX(0.8f), checkerboard));
 
         Timer timer = new Timer(15, actionEvent -> {
             angle += 0.01;
             repaint();
         });
         timer.start();
+    }
+
+    private static BufferedImage getBilinearTexture() {
+        BufferedImage bilinearTexture = new BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                int r = (x * 255) / 7;
+                int g = (y * 255) / 7;
+                int b = 255 - r;
+                int a = 255;
+                int col = (a << 24) | (r << 16) | (g << 8) | b;
+                bilinearTexture.setRGB(x, y, col);
+            }
+        }
+        return bilinearTexture;
     }
 
     @Override
@@ -241,7 +229,7 @@ public class Main extends JPanel {
             Vector3 EPHat = Vector3.normalize(P.subtract(cameraPosition));
             float specularAngle = Vector3.dot(sHat, EPHat);
             if (specularAngle > 0) {
-                color = color.add(LightColour.multiply(PSpecular).multiply((float) Math.pow(specularAngle, 10)));
+                color = color.add(LightColour.multiply(PSpecular).multiply((float) Math.pow(specularAngle, 30)));
             }
         }
 
