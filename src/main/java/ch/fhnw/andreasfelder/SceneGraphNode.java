@@ -13,11 +13,16 @@ public class SceneGraphNode {
     public final List<Tri> tri = new ArrayList<>();
     public Matrix4x4 transformation = Matrix4x4.IDENTITY;
     public BufferedImage texture = null;
+    public final List<SceneGraphNode> children = new ArrayList<>();
 
     public SceneGraphNode(List<Vertex> vertices, List<Tri> tri, Matrix4x4 transformation, BufferedImage texture) {
         this.vertices.addAll(vertices);
         this.tri.addAll(tri);
         this.transformation = transformation;
         this.texture = texture;
+    }
+
+    public void addChild(SceneGraphNode child) {
+        children.add(child);
     }
 }

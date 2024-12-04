@@ -1,33 +1,20 @@
 package ch.fhnw.andreasfelder;
 
 import ch.fhnw.andreasfelder.helpers.vertexColor;
-import ch.fhnw.andreasfelder.vector.Matrix3x2;
-import ch.fhnw.andreasfelder.vector.Matrix4x4;
-import ch.fhnw.andreasfelder.vector.MeshGenerator;
-import ch.fhnw.andreasfelder.vector.Tri;
-import ch.fhnw.andreasfelder.vector.Vector2;
-import ch.fhnw.andreasfelder.vector.Vector3;
-import ch.fhnw.andreasfelder.vector.Vector4;
-import ch.fhnw.andreasfelder.vector.Vertex;
+import ch.fhnw.andreasfelder.vector.*;
 
-import javax.imageio.ImageIO;
-import javax.swing.JFrame;
-import javax.swing.JPanel;
-import javax.swing.Timer;
-import java.awt.Graphics;
+import javax.swing.*;
+import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Main extends JPanel {
-    public final List<Vertex> vertices = new ArrayList<>();
-    public final List<Tri> tri = new ArrayList<>();
     private final List<SceneGraphNode> sceneQueue = new ArrayList<>();
 
     private float angle = 0;
 
-    public final Vector3 cameraPosition = new Vector3(0, 0, -4);
+    public final Vector3 cameraPosition = new Vector3(0, 0, -8);
     public final Vector3 lookAt = new Vector3(0, 0, 0);
     public final Vector3 up = new Vector3(0, -1, 0);
     public Vector3 LightPos = new Vector3(0, 0, -6);
@@ -47,7 +34,7 @@ public class Main extends JPanel {
 
     public Main() {
         // Setup frame
-        JFrame frame = new JFrame("Multi-Object Renderer");
+        JFrame frame = new JFrame("Scene Graph Renderer");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(600, 600);
         frame.add(this);
@@ -59,19 +46,39 @@ public class Main extends JPanel {
 
         BufferedImage bilinearTexture = getBilinearTexture();
 
-        // Cube 1
+        // Prepare cube vertices and triangles
         List<Vertex> cubeVertices = new ArrayList<>();
         List<Tri> cubeTris = new ArrayList<>();
         MeshGenerator.addCube(cubeVertices, cubeTris, vertexColor.RED, vertexColor.GREEN, vertexColor.BLUE, vertexColor.YELLOW, vertexColor.MAGENTA, vertexColor.CYAN);
-        try {
-            BufferedImage texture = ImageIO.read(this.getClass().getResourceAsStream("/test1.jpg"));
-            sceneQueue.add(new SceneGraphNode(cubeVertices, cubeTris, Matrix4x4.createRotationY(0.5f), bilinearTexture));
-        } catch (IOException e) {
-            sceneQueue.add(new SceneGraphNode(cubeVertices, cubeTris, Matrix4x4.createRotationY(0.5f), null));
-        }
+
+        //Prepare the sphere
+        List<Vertex> sphereVertices = new ArrayList<>();
+        List<Tri> sphereTris = new ArrayList<>();
+        MeshGenerator.addSphere(sphereVertices, sphereTris, 15, vertexColor.BLUE);
+
+        // Create root node
+        SceneGraphNode rootNode = new SceneGraphNode(new ArrayList<>(), new ArrayList<>(), Matrix4x4.IDENTITY, null);
+
+        // Create cube node 1
+        SceneGraphNode cubeNode1 = new SceneGraphNode(cubeVertices, cubeTris, Matrix4x4.createTranslation(0, 0, 0), bilinearTexture);
+
+        // Create sphere node 2 as a child of cubeNode1
+        SceneGraphNode sphereNode2 = new SceneGraphNode(sphereVertices, sphereTris, Matrix4x4.createTranslation(2, 0, 0), null);
+
+        // Build hierarchy
+        cubeNode1.addChild(sphereNode2);
+        rootNode.addChild(cubeNode1);
+
+        // Add root node to scene queue
+        sceneQueue.add(rootNode);
 
         Timer timer = new Timer(15, actionEvent -> {
-            angle += 0.01;
+            angle += 0.01f;
+
+            // Update transformations
+            cubeNode1.transformation = Matrix4x4.createRotationY(angle);
+            sphereNode2.transformation = Matrix4x4.createTranslation(4, 0, 0).multiply(Matrix4x4.createRotationY(-angle * 2));
+
             repaint();
         });
         timer.start();
@@ -105,19 +112,29 @@ public class Main extends JPanel {
         float h_half = getHeight() / 2f;
 
         for (SceneGraphNode node : sceneQueue) {
-            Matrix4x4 rotationTransform = Matrix4x4.createRotationY(angle).multiply(node.transformation);
-            Matrix4x4 MVP = rotationTransform.multiply(VP);
-
-            for (Tri t : node.tri) {
-                Vertex A = projectVertex(VertexShader(node.vertices.get(t.a()), MVP, rotationTransform));
-                Vertex B = projectVertex(VertexShader(node.vertices.get(t.b()), MVP, rotationTransform));
-                Vertex C = projectVertex(VertexShader(node.vertices.get(t.c()), MVP, rotationTransform));
-
-                renderTriangle(A, B, C, node.texture, screenImage, w_half, h_half);
-            }
+            renderNode(node, Matrix4x4.IDENTITY, screenImage, w_half, h_half);
         }
 
         g.drawImage(screenImage, 0, 0, null);
+    }
+
+    public void renderNode(SceneGraphNode node, Matrix4x4 parentTransform, BufferedImage screenImage, float w_half, float h_half) {
+        Matrix4x4 currentTransform = node.transformation.multiply(parentTransform);
+        Matrix4x4 MVP = currentTransform.multiply(VP);
+
+        // Render this node's geometry
+        for (Tri t : node.tri) {
+            Vertex A = projectVertex(VertexShader(node.vertices.get(t.a()), MVP, currentTransform));
+            Vertex B = projectVertex(VertexShader(node.vertices.get(t.b()), MVP, currentTransform));
+            Vertex C = projectVertex(VertexShader(node.vertices.get(t.c()), MVP, currentTransform));
+
+            renderTriangle(A, B, C, node.texture, screenImage, w_half, h_half);
+        }
+
+        // Recursively render child nodes
+        for (SceneGraphNode child : node.children) {
+            renderNode(child, currentTransform, screenImage, w_half, h_half);
+        }
     }
 
     private void renderTriangle(Vertex A, Vertex B, Vertex C, BufferedImage texture, BufferedImage screenImage, float w_half, float h_half) {
@@ -132,8 +149,8 @@ public class Main extends JPanel {
         Vector3 b = new Vector3(p2.x(), p2.y(), 0);
         Vector3 c = new Vector3(p3.x(), p3.y(), 0);
 
-        // Backface culling, no Z component, pass 0 to z component
-        if (Vector3.cross(b.subtract(a), c.subtract(a)).z() > 0) {
+        // Backface culling
+        if (Vector3.cross(b.subtract(a), c.subtract(a)).z() < 0) {
             return;
         }
 
@@ -172,7 +189,7 @@ public class Main extends JPanel {
                     if (z < zBuffer[y][x]) {
                         zBuffer[y][x] = z;
 
-                        Vector3 color = fragmentShader(Q, texture, true);
+                        Vector3 color = fragmentShader(Q, texture, false);
                         screenImage.setRGB(x, y, color.awtColorFromVector().getRGB());
                     }
                 }
@@ -183,7 +200,6 @@ public class Main extends JPanel {
     protected Vector3 fragmentShader(Vertex Q, BufferedImage texture, boolean bilinearFiltering) {
         // Local illumination model
         Vector3 nHat = Vector3.normalize(Q.normal());
-        assert Math.abs(nHat.length() - 1.0f) < 0.01;
 
         Vector3 P = Q.worldCoordinates();
         Vector3 PL = LightPos.subtract(P);
@@ -220,7 +236,6 @@ public class Main extends JPanel {
 
         float diffuseAngle = Vector3.dot(nHat, PLHat);
         if (diffuseAngle > 0) {
-
             // Lambert
             color = color.add(Vector3.multiply(LightColour, Q.color()).multiply(diffuseAngle));
 
@@ -237,7 +252,7 @@ public class Main extends JPanel {
     }
 
     Vertex VertexShader(Vertex v, Matrix4x4 MVP, Matrix4x4 M) {
-        Matrix4x4 MNormal = Matrix4x4.transpose(Matrix4x4.invert(M)).multiply(M.getDeterminant());
+        Matrix4x4 MNormal = Matrix4x4.transpose(Matrix4x4.invert(M));
 
         Vector4 transformedPosition = Vector4.transform(v.position(), MVP);
         Vector4 transformedWorldPosition = Vector4.transform(v.position(), M);
@@ -245,27 +260,12 @@ public class Main extends JPanel {
 
         return new Vertex(
             transformedPosition,
-            new Vector3(transformedWorldPosition.x(), transformedPosition.y(), transformedWorldPosition.z()),
+            new Vector3(transformedWorldPosition.x(), transformedWorldPosition.y(), transformedWorldPosition.z()),
             v.color(),
             v.st(),
             transformedNormal
         );
     }
-
-//    private static Vertex VertexShader(Vertex v, Matrix4x4 M, Matrix4x4 VP)
-//    {
-//        Vector4 pos = Vector4.Transform(v.Position, M * VP);
-//        Vector4 worldC = Vector4.Transform(v.Position, M);
-//
-//        Matrix4x4 inverted;
-//        Matrix4x4.Invert(M, out inverted);
-//        inverted = Matrix4x4.Transpose(inverted);
-//        Vector4 norm4 = Vector4.Transform(new Vector4(v.Normal.X, v.Normal.Y, v.Normal.Z, 0), inverted * M.GetDeterminant());
-//
-//        Vector3 norm = new Vector3(norm4.X, norm4.Y, norm4.Z);
-//
-//        return new Vertex(pos, new Vector3(worldC.X, worldC.Y, worldC.Z), v.Color, v.ST, norm);
-//    }
 
     private Vector2 transformToScreenPixel(Vertex v, float w_half, float h_half) {
         float x = v.position().x();
@@ -273,7 +273,8 @@ public class Main extends JPanel {
 
         return new Vector2(
             (x * w_half + w_half),
-            (y * w_half + h_half));
+            (-y * h_half + h_half) // Flip y-axis
+        );
     }
 
     private Vertex projectVertex(Vertex v) {
