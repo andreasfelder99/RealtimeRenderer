@@ -34,6 +34,8 @@ public class Main extends JPanel {
 
     protected float[][] zBuffer;
 
+    private boolean wireframeMode = false;
+
     public Main() {
         // Setup frame
         JFrame frame = new JFrame("Scene Graph Renderer");
@@ -184,6 +186,14 @@ public class Main extends JPanel {
             return;
         }
 
+        //Wireframe mode
+        if (wireframeMode){
+            Graphics g = screenImage.getGraphics();
+            g.setColor(Color.BLACK);
+            g.drawLine((int)p1.x(), (int)p1.y(), (int)p2.x(), (int)p2.y());
+            g.drawLine((int)p2.x(), (int)p2.y(), (int)p3.x(), (int)p3.y());
+            g.drawLine((int)p3.x(), (int)p3.y(), (int)p1.x(), (int)p1.y());
+        } else {
         Vector2 ABScreenPixel = p2.subtract(p1);
         Vector2 ACScreenPixel = p3.subtract(p1);
         Matrix3x2 ABACInv = Matrix3x2.invert(new Matrix3x2(
@@ -224,6 +234,7 @@ public class Main extends JPanel {
                     }
                 }
             }
+        }
         }
     }
 
