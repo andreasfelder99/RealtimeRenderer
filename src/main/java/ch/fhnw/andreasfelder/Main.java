@@ -3,9 +3,11 @@ package ch.fhnw.andreasfelder;
 import ch.fhnw.andreasfelder.helpers.vertexColor;
 import ch.fhnw.andreasfelder.vector.*;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,7 +16,7 @@ public class Main extends JPanel {
 
     private float angle = 0;
 
-    public final Vector3 cameraPosition = new Vector3(0, 0, -8);
+    public final Vector3 cameraPosition = new Vector3(0, 0, -6);
     public final Vector3 lookAt = new Vector3(0, 0, 0);
     public final Vector3 up = new Vector3(0, -1, 0);
     public Vector3 LightPos = new Vector3(0, 0, -6);
@@ -45,29 +47,53 @@ public class Main extends JPanel {
         VP = V.multiply(P);
 
         BufferedImage bilinearTexture = getBilinearTexture();
+        BufferedImage texture = null;
+        try {
+            texture = ImageIO.read(this.getClass().getResourceAsStream("/bricks.jpg"));
+        } catch (IOException e){
+            System.out.println("Could not load texture");
+        }
 
         // Prepare cube vertices and triangles
         List<Vertex> cubeVertices = new ArrayList<>();
         List<Tri> cubeTris = new ArrayList<>();
         MeshGenerator.addCube(cubeVertices, cubeTris, vertexColor.RED, vertexColor.GREEN, vertexColor.BLUE, vertexColor.YELLOW, vertexColor.MAGENTA, vertexColor.CYAN);
 
-        //Prepare the sphere
+        List<Vertex> cube2Vertices = new ArrayList<>();
+        List<Tri> cube2Tris = new ArrayList<>();
+        MeshGenerator.addCube(cube2Vertices,cube2Tris,vertexColor.BLUE, vertexColor.CYAN, vertexColor.RED, vertexColor.GREEN, vertexColor.MAGENTA, vertexColor.YELLOW);
+
+        //Prepare the sphere1
         List<Vertex> sphereVertices = new ArrayList<>();
         List<Tri> sphereTris = new ArrayList<>();
         MeshGenerator.addSphere(sphereVertices, sphereTris, 15, vertexColor.BLUE);
+
+        //Prepare the sphere2
+        List<Vertex> sphereVertices2 = new ArrayList<>();
+        List<Tri> sphereTris2 = new ArrayList<>();
+        MeshGenerator.addSphere(sphereVertices2, sphereTris2, 15, vertexColor.RED);
 
         // Create root node
         SceneGraphNode rootNode = new SceneGraphNode(new ArrayList<>(), new ArrayList<>(), Matrix4x4.IDENTITY, null);
 
         // Create cube node 1
-        SceneGraphNode cubeNode1 = new SceneGraphNode(cubeVertices, cubeTris, Matrix4x4.createTranslation(0, 0, 0), bilinearTexture);
+        SceneGraphNode cubeNode1 = new SceneGraphNode(cubeVertices, cubeTris, Matrix4x4.IDENTITY, texture);
 
-        // Create sphere node 2 as a child of cubeNode1
-        SceneGraphNode sphereNode2 = new SceneGraphNode(sphereVertices, sphereTris, Matrix4x4.createTranslation(2, 0, 0), null);
+        // Create cube node 2
+        SceneGraphNode cubeNode2 = new SceneGraphNode(cube2Vertices, cube2Tris, Matrix4x4.IDENTITY, null);
+
+        // Create sphere node as a child of cubeNode1
+        SceneGraphNode sphereNode1 = new SceneGraphNode(sphereVertices, sphereTris, Matrix4x4.IDENTITY, null);
+
+        //Create sphere node 2 as a independent node
+        SceneGraphNode sphereNode2 = new SceneGraphNode(sphereVertices2, sphereTris2, Matrix4x4.IDENTITY, null);
 
         // Build hierarchy
-        cubeNode1.addChild(sphereNode2);
+        cubeNode1.addChild(sphereNode1);
+
+        //Add to root node
         rootNode.addChild(cubeNode1);
+        rootNode.addChild(sphereNode2);
 
         // Add root node to scene queue
         sceneQueue.add(rootNode);
@@ -77,7 +103,11 @@ public class Main extends JPanel {
 
             // Update transformations
             cubeNode1.transformation = Matrix4x4.createRotationY(angle);
-            sphereNode2.transformation = Matrix4x4.createTranslation(4, 0, 0).multiply(Matrix4x4.createRotationY(-angle * 2));
+            cubeNode2.transformation = Matrix4x4.createRotationY(-angle);
+            //Due to sphereNode 2 being a child of cubeNode1, it 'inherits' the rotationY Matrix and we just multiply it with a translation.
+            sphereNode1.transformation = Matrix4x4.createTranslation(4, 0, 0);
+            //sphereNode2 is independent of cubeNode1 so we give it a translation and a rotation
+            sphereNode2.transformation = Matrix4x4.createTranslation(0,2.5f,0).multiply(Matrix4x4.createRotationZ(-angle * 2));
 
             repaint();
         });
@@ -189,7 +219,7 @@ public class Main extends JPanel {
                     if (z < zBuffer[y][x]) {
                         zBuffer[y][x] = z;
 
-                        Vector3 color = fragmentShader(Q, texture, false);
+                        Vector3 color = fragmentShader(Q, texture, true);
                         screenImage.setRGB(x, y, color.awtColorFromVector().getRGB());
                     }
                 }
